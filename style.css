@@ -1,0 +1,117 @@
+/* ===== 色やサイズの設定（ここを変えると全体の雰囲気が変わる） ===== */
+:root {
+  --bg: #f6f3ee;        /* 背景 */
+  --card: #ffffff;      /* カード */
+  --text: #1f1f1f;      /* 文字 */
+  --sub: #6b6b6b;       /* 薄い文字 */
+  --accent: #f07a5a;    /* note のアイコンに合わせたオレンジ */
+  --line: #e6e1d8;      /* 枠線 */
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif;
+  line-height: 1.7;
+}
+
+.card {
+  width: 100%;
+  max-width: 480px;
+  background: var(--card);
+  border-radius: 20px;
+  padding: 32px 24px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+}
+
+.hidden { display: none !important; }   /* 見えなくするためのクラス（ほかの指定より優先） */
+
+.label {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--sub);
+  letter-spacing: 0.05em;
+}
+
+h1 { margin: 0 0 12px; font-size: 26px; line-height: 1.4; }
+h2 { margin: 16px 0 20px; font-size: 20px; line-height: 1.5; }
+.lead { margin: 0 0 24px; color: var(--sub); }
+
+/* 選択肢のボタン */
+.choices { display: flex; flex-direction: column; gap: 12px; }
+
+.choice {
+  width: 100%;
+  padding: 16px;
+  font-size: 16px;
+  text-align: left;
+  background: var(--card);
+  color: var(--text);
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.choice:hover { border-color: var(--accent); background: #fff6f2; }
+.choice.selected { border-color: var(--accent); background: #fff6f2; font-weight: bold; }
+.choice:disabled { opacity: 0.35; cursor: not-allowed; border-color: var(--line); background: var(--card); }
+.next-button { margin-top: 8px; }
+
+/* 進み具合のバー */
+.bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.bar-fill { height: 100%; width: 0; background: var(--accent); transition: width 0.3s; }
+
+/* 結果画面のボタン */
+.main-button, .sub-button {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  font-size: 16px;
+  text-align: center;
+  text-decoration: none;
+  border-radius: 12px;
+  cursor: pointer;
+}
+.main-button { background: var(--accent); color: #fff; border: none; margin-bottom: 12px; }
+.sub-button { background: none; color: var(--text); border: 2px solid var(--line); }
+
+.text-button {
+  margin-top: 20px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--sub);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* 結果画面のスペック表と理由 */
+.specs { margin: 0 0 20px; }
+.spec-table { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 0 0 20px; font-size: 14px; }
+.spec-table dt { color: var(--sub); white-space: nowrap; }
+.spec-table dd { margin: 0; }
+.reason-list { margin: 0; padding-left: 1.2em; font-size: 14px; }
+.reason-list li { margin: 2px 0; }
+
+/* 照合前の機種の注意書き */
+.unverified { margin: 12px 0 0; font-size: 12px; color: var(--sub); }
+
+/* 予算を上げたときのひとこと */
+.advice { margin: 16px 0 0; padding: 12px 14px; font-size: 14px; background: #fff6f2; border-left: 4px solid var(--accent); border-radius: 8px; }
+
+/* 結果画面の「ほかの候補」 */
+.others { margin: 0 0 24px; padding: 16px; background: var(--bg); border-radius: 12px; }
+.other-item { margin: 4px 0 0; font-size: 15px; }
+
+footer { margin-top: 20px; max-width: 480px; font-size: 13px; text-align: center; }
+.disclaimer { margin: 12px 0 0; font-size: 11px; line-height: 1.6; color: var(--sub); }
+footer a { color: var(--sub); }
