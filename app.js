@@ -297,6 +297,55 @@ function reasons(m, candidates) {
   return list;
 }
 
+// 「今使っているスマホ」「持っている機器」で選んだメーカー（例：iPhone）が1位にならなかったとき、
+// そのメーカーのおすすめを案内するひとことを作る
+//  1. 条件にすべて合う機種があれば、その中でいちばん順位が高い機種
+//  2. なければ、重視した項目の★が足りないだけの「予算内の機種」と、
+//     予算を上げれば★も足りる「いちばん安い機種」の両方を案内する
+function loyaltyAdvice(best, ranking) {
+  // 答えの scores から、いちばん点数が多いメーカーを「こだわりのメーカー」とする
+  const answers = flatten(history);
+  const totals = {};
+  for (const answer of answers) {
+    for (const maker in answer.scores || {}) totals[maker] = (totals[maker] || 0) + answer.scores[maker];
+  }
+  const maker = Object.keys(totals).sort((x, y) => totals[y] - totals[x])[0];
+  if (!maker || best.maker === maker) return null;
+  const makerName = current.makers[maker].name;
+  const ofMaker = (rows) => rows.map((r) => r.model).filter((m) => m.maker === maker);
+
+  // 1. 条件にすべて合う機種がある
+  const inside = ofMaker(ranking)[0];
+  if (inside) {
+    return `${makerName}にこだわる場合：条件に合う中では ${inside.name}（${yen(inside.price)}）がおすすめです。`;
+  }
+
+  const priority = answers.find((a) => a.attr);
+  const budget = answers.find((a) => a.budget);
+  const label = priority ? `「${priority.label}」` : "";
+  const parts = [];
+
+  // 2-a. 予算内にはあるが、重視した項目の★が足りない機種
+  const withoutPriority = answers.filter((a) => !a.attr);
+  const inBudget = ofMaker(calcModelResult(current, withoutPriority))[0];
+  if (inBudget && priority) {
+    parts.push(`予算内なら ${inBudget.name}（${yen(inBudget.price)}）がありますが、${label}は${stars(inBudget.scores[priority.attr])}です`);
+  }
+
+  // 2-b. 予算を上げれば条件に合う、いちばん安い機種
+  if (budget) {
+    const upper = ofMaker(calcModelResult(current, answers.filter((a) => !a.budget)))
+      .filter((m) => m.price > budget.budget.max)
+      .sort((x, y) => x.price - y.price)[0];
+    if (upper) {
+      const diff = yen(upper.price - budget.budget.max).replace("〜", "");
+      parts.push(`予算をあと${diff}上げると ${upper.name}（${yen(upper.price)}）があります`);
+    }
+  }
+  if (parts.length === 0) return null;   // イヤホンジャックなど予算以外の条件で外れているなら案内しない
+  return `${makerName}にこだわる場合：${parts.join("。")}。`;
+}
+
 // 重視した項目が★PRIORITY_GOOD_STARS 未満のとき、予算以外の条件はそのままで
 // ★PRIORITY_GOOD_STARS 以上になるいちばん安い機種を探して、ひとことにする
 function upgradeAdvice(best) {
@@ -392,8 +441,8 @@ function showResult() {
       link.href = current.link;
 
       // ワンポイント：予算内に重視した項目が★3以上の機種がないとき、予算を上げた場合の候補を出す
-      const advice = upgradeAdvice(best);
-      if (advice) {
+      for (const advice of [loyaltyAdvice(best, ranking), upgradeAdvice(best)]) {
+        if (!advice) continue;
         const tip = document.createElement("p");
         tip.className = "advice";
         tip.textContent = advice;
