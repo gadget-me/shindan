@@ -376,6 +376,58 @@ function upgradeAdvice(best) {
   return text;
 }
 
+// 「条件を変えると」：答えを1つだけ変えたら、重視した項目がもっと高い機種や、もっと安い機種が出るか
+//  質問に short（例："予算"）が書いてあるものだけ試す。いちばん役に立ちそうなものを WHAT_IFS 個まで返す
+function whatIfs(best, ranking) {
+  const priority = flatten(history).find((a) => a.attr);
+  if (!priority) return [];
+  const shown = new Set(ranking.slice(0, 1 + RUNNER_UPS).map((r) => r.model));
+  const bestScore = best.scores[priority.attr];
+  const found = [];
+  current.questions.forEach((q, i) => {
+    if (!q.short || !history[i]) return;
+    const tries = [];
+    if (q.multi) {
+      // 複数選んだ条件は、1つずつ外してみる
+      for (const part of history[i].parts || []) {
+        if (part.none) continue;
+        const rest = history[i].parts.filter((p) => p !== part);
+        tries.push({ text: `${q.short}の「${part.label.replace(/（.*）/, "")}」がなくてもよければ`, answer: { parts: rest } });
+      }
+    } else {
+      for (const a of q.answers) {
+        if (a === history[i]) continue;
+        tries.push({ text: `${q.short}を「${a.label.replace(/（.*）/, "")}」にすると`, answer: a });
+      }
+    }
+    for (const t of tries) {
+      const changed = history.map((h, j) => (j === i ? t.answer : h));
+      const rows = calcModelResult(current, changed);
+      if (rows.length === 0) continue;
+      const m = rows[0].model;
+      if (shown.has(m)) continue;
+      // 「日本のメーカーだと安心」のような好みの答えなら、その好みに合う機種のときだけ出す
+      const wish = [...(t.answer.bonus || []).map((b) => b.when), t.answer.match].filter(Boolean);
+      if (wish.length > 0 && !wish.some((w) => matches(m, w))) continue;
+      const gain = m.scores[priority.attr] - bestScore;
+      const sameStars = starCount(m.scores[priority.attr]) >= starCount(bestScore);
+      const saving = best.price - m.price;
+      let value = 0;
+      if (gain >= 1) value = gain;                                         // 重視した項目がはっきり上がる
+      else if (sameStars && saving >= best.price * 0.15) value = saving / best.price;   // 同じ★のまま15%以上安い
+      if (value > 0) found.push({ q: i, text: t.text, model: m, value, attr: priority.attr, cheaper: gain < 1 ? saving : 0 });
+    }
+  });
+  found.sort((a, b) => b.value - a.value);
+  const picked = [];
+  for (const f of found) {
+    if (picked.length >= WHAT_IFS) break;
+    if (picked.some((p) => p.model === f.model || p.q === f.q)) continue;   // 同じ機種・同じ質問は1回だけ
+    picked.push(f);
+  }
+  return picked;
+}
+
 // ③ 結果画面
 function showResult() {
   const nameEl = document.getElementById("result-name");
@@ -473,6 +525,25 @@ function showResult() {
           const item = document.createElement("p");
           item.className = "other-item";
           item.textContent = `${row.model.name}（${yen(row.model.price)}${priceNote(row.model)}）`;
+          othersEl.appendChild(item);
+        }
+        othersEl.classList.remove("hidden");
+      }
+
+      // 条件を変えると（小さく表示）
+      const ifs = whatIfs(best, ranking);
+      if (ifs.length > 0) {
+        const title = document.createElement("p");
+        title.className = "label whatif-title";
+        title.textContent = "条件を変えると";
+        othersEl.appendChild(title);
+        const pr = flatten(history).find((a) => a.attr);
+        const label = pr.attr === "overall" ? "総合" : pr.label.replace(/（.*）/, "");
+        for (const f of ifs) {
+          const item = document.createElement("p");
+          item.className = "whatif-item";
+          const merit = f.cheaper > 0 ? `${yen(f.cheaper).replace("〜", "")}安い` : `${label} ${stars(f.model.scores[f.attr])}`;
+          item.textContent = `${f.text} → ${f.model.name}（${yen(f.model.price)}・${merit}）`;
           othersEl.appendChild(item);
         }
         othersEl.classList.remove("hidden");

@@ -38,6 +38,9 @@ const PRIORITY_GOOD_BONUS = 4;
 // 結果画面に「ほかの候補」として何機種出すか
 const RUNNER_UPS = 2;
 
+// 結果画面の「条件を変えると」に何個まで出すか（質問に short を書いたものだけ試す）
+const WHAT_IFS = 2;
+
 const DIAGNOSES = {
 
   // ------------------------------------------------------------
@@ -55,6 +58,7 @@ const DIAGNOSES = {
       // ---- 候補をしぼる質問 ----
       {
         text: "予算の上限は？",
+        short: "予算",
         // 上限より高い機種と、ひとつ下の価格帯よりさらに安い機種は外す
         answers: [
           { label: "〜5万円",   budget: { min: 0,      max: 50000 } },
@@ -66,6 +70,7 @@ const DIAGNOSES = {
       },
       {
         text: "絶対に必要な機能は？（いくつでも選べます）",
+        short: "必要な機能",
         multi: true,
         answers: [
           { label: "おサイフケータイ（Suica・iD・QUICPayなど）", only: { felica: true } },
@@ -76,6 +81,7 @@ const DIAGNOSES = {
       },
       {
         text: "画面の大きさは？",
+        short: "画面の大きさ",
         answers: [
           { label: "片手で持てる小さめ（6.3インチくらいまで）", match: { size: "small" }, points: 3, exclude: { size: "fold" },
             bonus: [{ when: { light: true }, points: 1.5 }] },   // 小さめが好きな人は軽さも大事
@@ -86,6 +92,7 @@ const DIAGNOSES = {
       },
       {
         text: "メーカーの国にこだわりはある？",
+        short: "メーカーの国",
         answers: [
           { label: "日本のメーカーだと安心", bonus: [{ when: { japan: true }, points: 3 }] },
           { label: "中国メーカーは避けたい", exclude: { chinese: true } },   // makers.js の country が "CN" のメーカーを外す
@@ -142,6 +149,7 @@ const DIAGNOSES = {
       // ---- 候補をしぼる質問 ----
       {
         text: "パソコンを持ち運びますか？",
+        short: "持ち運び",
         answers: [
           { label: "毎日持ち歩く（学校・職場など）", exclude: { desktop: true }, attrs: { portability: 0.8, battery: 0.6 } },
           { label: "ときどき持ち出す", exclude: { desktop: true }, attrs: { portability: 0.4, battery: 0.3 } },
@@ -150,6 +158,7 @@ const DIAGNOSES = {
       },
       {
         text: "どんな形がいい？",
+        short: "形",
         answers: [
           { label: "普通のノートパソコン", only: { form: "note" } },
           { label: "タブレットにもなる 2in1（Surface など）", only: { form: "2in1" } },
@@ -160,6 +169,7 @@ const DIAGNOSES = {
       },
       {
         text: "OS（Windows か Mac か）は？",
+        short: "OS",
         answers: [
           { label: "Windows", only: { os: "win" } },
           { label: "Mac", only: { os: "mac" } },
@@ -168,6 +178,7 @@ const DIAGNOSES = {
       },
       {
         text: "主な使いみちは？（いくつでも選べます）",
+        short: "使いみち",
         multi: true,
         answers: [
           { label: "レポート・ネット・動画を見る", attrs: { value: 0.4, battery: 0.3 } },
@@ -183,6 +194,7 @@ const DIAGNOSES = {
       },
       {
         text: "絶対に必要な端子は？（いくつでも選べます）",
+        short: "端子",
         multi: true,
         answers: [
           { label: "HDMI（テレビ・モニター・プロジェクターにつなぐ）", only: { hdmi: true }, reason: "HDMI出力あり" },
@@ -202,6 +214,7 @@ const DIAGNOSES = {
       },
       {
         text: "予算の上限は？",
+        short: "予算",
         // 上限より高い機種と、ひとつ下の価格帯よりさらに安い機種は外す
         answers: [
           { label: "〜15万円", budget: { min: 0,      max: 150000 } },
