@@ -188,6 +188,7 @@ function calcModelResult(diagnosis, answers) {
       const m = row.model;
       if (answer.scores && answer.scores[m.maker]) row.score += answer.scores[m.maker];   // メーカーに点数
       if (answer.attr) row.score += m.scores[answer.attr] * ATTR_WEIGHT;                   // 重視する性能の評価（scoring.js）
+      for (const k in answer.attrs || {}) row.score += m.scores[k] * answer.attrs[k] * ATTR_WEIGHT;  // 使いみちなどの評価（いくつでも）
       if (answer.match && matches(m, answer.match)) row.score += answer.points;            // 条件に合えば点数
       for (const b of answer.bonus || []) if (matches(m, b.when)) row.score += b.points;  // 追加の条件ボーナス
       if (answer.budget && (m.price < answer.budget.min || m.price > answer.budget.max)) row.alive = false;  // 予算外は外す
@@ -198,17 +199,20 @@ function calcModelResult(diagnosis, answers) {
 
   // 重視した項目の星の数でしぼる・加点する
   //  1. 条件に合う機種の中に ★PRIORITY_GOOD_STARS 以上があれば、それ未満は外す
-  //  2. なければ ★PRIORITY_MIN_STARS 以上だけ残す（それもなければ外さない）
+  //  2. なければ ★PRIORITY_MIN_STARS 以上だけ残す（それもなければ0機種＝その答えは表示されない）
   //  3. ★PRIORITY_GOOD_STARS 以上の機種には PRIORITY_GOOD_BONUS 点を足す
   const priority = answers.find((a) => a.attr);
   if (priority) {
     const starsOf = (row) => starCount(row.model.scores[priority.attr]);
+    let kept = false;
     for (const level of [PRIORITY_GOOD_STARS, PRIORITY_MIN_STARS]) {
       if (rows.some((row) => row.alive && starsOf(row) >= level)) {
         for (const row of rows) if (starsOf(row) < level) row.alive = false;
+        kept = true;
         break;
       }
     }
+    if (!kept) for (const row of rows) row.alive = false;   // 重視した項目が★1しかないなら、その答えは選べないようにする
     for (const row of rows) if (starsOf(row) >= PRIORITY_GOOD_STARS) row.score += PRIORITY_GOOD_BONUS;
   }
 
@@ -285,11 +289,13 @@ function reasons(m, candidates) {
     if (answer.match && matches(m, answer.match)) list.push(`「${answer.label}」に合うサイズ`);
     for (const b of answer.bonus || []) {
       if (!matches(m, b.when)) continue;
-      if (b.when.light) list.push(`${m.weight}g と軽い`);
+      if (b.reason) list.push(b.reason);
+      else if (b.when.light) list.push(`${m.weight}g と軽い`);
       else if (b.when.japan) list.push("日本のメーカー");
       else if (b.when.android) list.push("今と同じ Android なので乗り換えが楽");
       else list.push(`「${answer.label}」に合う`);
     }
+    if (answer.only && answer.reason) list.push(answer.reason);
     if (answer.only && answer.only.felica) list.push("おサイフケータイ対応");
     if (answer.only && answer.only.jack) list.push("イヤホンジャックあり");
     if (answer.only && answer.only.ip) list.push(`防水防塵（${answer.only.ip}）`);
@@ -395,12 +401,13 @@ function showResult() {
     } else {
       const best = ranking[0].model;
       nameEl.textContent = best.name;
-      descEl.textContent = `${current.makers[best.maker].name}　${yen(best.price)}（税込）`;
+      const priceNote = (m) => (current.priceNote ? current.priceNote(m, flatten(history)) : "");
+      descEl.textContent = `${current.makers[best.maker].name}　${yen(best.price)}（税込）${priceNote(best)}`;
 
       // スペック表
       const table = document.createElement("dl");
       table.className = "spec-table";
-      for (const [label, value] of specLines(best)) {
+      for (const [label, value] of (current.specLines || specLines)(best)) {
         const dt = document.createElement("dt");
         dt.textContent = label;
         const dd = document.createElement("dd");
@@ -425,6 +432,12 @@ function showResult() {
         specEl.append(title, ul);
       }
       // まだ3つの情報源で照合していない機種には注意書きを出す
+      for (const text of current.notices ? current.notices(best) : []) {
+        const note = document.createElement("p");
+        note.className = "unverified";
+        note.textContent = text;
+        specEl.appendChild(note);
+      }
       if (best.discontinued) {
         const warn = document.createElement("p");
         warn.className = "unverified";
@@ -459,7 +472,7 @@ function showResult() {
         for (const row of others) {
           const item = document.createElement("p");
           item.className = "other-item";
-          item.textContent = `${row.model.name}（${yen(row.model.price)}）`;
+          item.textContent = `${row.model.name}（${yen(row.model.price)}${priceNote(row.model)}）`;
           othersEl.appendChild(item);
         }
         othersEl.classList.remove("hidden");
@@ -481,4 +494,5 @@ document.getElementById("retry-button").addEventListener("click", showStart);
 
 // スペックから評価を計算してから、スタート画面を出す
 addDerivedScores(MODELS);
+addPcScores(PC_MODELS);
 showStart();

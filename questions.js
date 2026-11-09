@@ -20,8 +20,9 @@
 //  同点なら総合評価が高いほう、それも同じなら安いほうが勝つ。
 //  前の答えで機種が1つも残らなくなる選択肢は、自動で表示されなくなる。
 //
-//  ノートPC診断は前のまま「メーカー（候補）ごと」の方式：
-//   { label: "…", scores: { sample_a: 1 } } → 候補 sample_a に 1 点
+//   attrs:  { battery: 0.5 }        → 機種のバッテリー評価 × 0.5 × ATTR_WEIGHT 点（使いみちなど、いくつでも）
+//   reason: "…"                    → only の条件に合ったとき、「選んだ理由」に出す文（bonus にも書ける）
+//   needOffice: true               → Office が付いていない機種に「Office込みなら約○○円」を出す（PC診断）
 
 // 「一番重視したいのは？」で、評価（0〜10点）に掛ける倍率。大きくするほど重視したことが効く
 const ATTR_WEIGHT = 1.2;
@@ -126,35 +127,112 @@ const DIAGNOSES = {
   },
 
   // ------------------------------------------------------------
-  //  ノートPC診断
+  //  PC診断（機種ごと）
   // ------------------------------------------------------------
   pc: {
-    hidden: true,   // 作りかけなので公開ページには出さない。完成したらこの行を消す
-    genreLabel: "💻 ノートPCを診断する",
-
-    candidates: {
-      // TODO: 候補を考えて書こう。例のかたち：
-      sample_a: {
-        name: "（候補A の名前）",
-        description: "（どんな人に向いているか）",
-        link: "https://note.com/gadget_me",
-      },
-      sample_b: {
-        name: "（候補B の名前）",
-        description: "（どんな人に向いているか）",
-        link: "https://note.com/gadget_me",
-      },
-    },
+    genreLabel: "💻 パソコンを診断する",
+    models: PC_MODELS,     // pc_models.js の機種データを使う
+    makers: PC_MAKERS,     // pc_makers.js
+    link: "https://note.com/gadget_me",
+    specLines: pcSpecLines,     // 結果画面のスペック表（pc_scoring.js）
+    priceNote: pcPriceNote,     // 「Office込みなら約○○円」
+    notices: pcNotices,         // BTO・別売品の注意書き
 
     questions: [
+      // ---- 候補をしぼる質問 ----
       {
-        text: "（質問の例）主な使いみちは？",
+        text: "パソコンを持ち運びますか？",
         answers: [
-          { label: "レポートや調べもの", scores: { sample_a: 1 } },
-          { label: "プログラミング", scores: { sample_b: 1 } },
+          { label: "毎日持ち歩く（学校・職場など）", exclude: { desktop: true }, attrs: { portability: 0.8, battery: 0.6 } },
+          { label: "ときどき持ち出す", exclude: { desktop: true }, attrs: { portability: 0.4, battery: 0.3 } },
+          { label: "家や職場に置いて使う", attrs: { screen: 0.3 } },
         ],
       },
-      // TODO: 質問を足していこう！
+      {
+        text: "どんな形がいい？",
+        answers: [
+          { label: "普通のノートパソコン", only: { form: "note" } },
+          { label: "タブレットにもなる 2in1（Surface など）", only: { form: "2in1" } },
+          { label: "画面が大きいノート（15インチ以上）", only: { big: true } },
+          { label: "デスクトップ（一体型・小型・タワー）", only: { desktop: true } },
+          { label: "こだわらない" },
+        ],
+      },
+      {
+        text: "OS（Windows か Mac か）は？",
+        answers: [
+          { label: "Windows", only: { os: "win" } },
+          { label: "Mac", only: { os: "mac" } },
+          { label: "こだわらない" },
+        ],
+      },
+      {
+        text: "主な使いみちは？（いくつでも選べます）",
+        multi: true,
+        answers: [
+          { label: "レポート・ネット・動画を見る", attrs: { value: 0.4, battery: 0.3 } },
+          { label: "プログラミング", attrs: { performance: 0.5 },
+            bonus: [{ when: { ram32: true }, points: 1, reason: "メモリが32GBあり、開発ツールを同時に動かしやすい" }] },
+          { label: "写真・動画の編集", attrs: { performance: 0.5, graphics: 0.4 },
+            bonus: [{ when: { ram32: true }, points: 1, reason: "メモリが32GBあり、編集ソフトが快適" }] },
+          { label: "ゲーム", only: { dgpu: true }, attrs: { graphics: 0.8 }, reason: "グラフィックボード搭載でゲーム向き" },
+          { label: "仕事・資料作り", attrs: { battery: 0.3, portability: 0.2 },
+            bonus: [{ when: { office: true }, points: 1.5, reason: "仕事で使う Word・Excel が付いている" }] },
+          { label: "特に決まっていない", none: true },
+        ],
+      },
+      {
+        text: "絶対に必要な端子は？（いくつでも選べます）",
+        multi: true,
+        answers: [
+          { label: "HDMI（テレビ・モニター・プロジェクターにつなぐ）", only: { hdmi: true }, reason: "HDMI出力あり" },
+          { label: "USB-A（昔ながらのUSB・USBメモリ）", only: { usbA: true }, reason: "USB-Aあり" },
+          { label: "有線LAN", only: { lan: true }, reason: "有線LANあり" },
+          { label: "SDカード（カメラの写真を取り込む）", only: { sd: true }, reason: "SDカードスロットあり" },
+          { label: "特になし", none: true },
+        ],
+      },
+      {
+        text: "Office（Word・Excel）は必要？",
+        answers: [
+          { label: "必要", needOffice: true,
+            bonus: [{ when: { office: true }, points: 2, reason: "Word・Excel が最初から付いている" }] },
+          { label: "必要ない・持っている" },
+        ],
+      },
+      {
+        text: "予算の上限は？",
+        // 上限より高い機種と、ひとつ下の価格帯よりさらに安い機種は外す
+        answers: [
+          { label: "〜15万円", budget: { min: 0,      max: 150000 } },
+          { label: "〜20万円", budget: { min: 0,      max: 200000 } },
+          { label: "〜30万円", budget: { min: 150001, max: 300000 } },
+          { label: "〜40万円", budget: { min: 200001, max: 400000 } },
+          { label: "40万円以上でもOK", budget: { min: 300001, max: Infinity } },
+        ],
+      },
+
+      // ---- 好みで点数をつける質問 ----
+      {
+        text: "ほかに持っている機器は？",
+        answers: [
+          { label: "iPhone・iPad", scores: { apple: 3 } },
+          { label: "Android スマホ", bonus: [{ when: { os: "win" }, points: 1, reason: "Android スマホと連携しやすい（スマートフォン連携）" }] },
+          { label: "特にない" },
+        ],
+      },
+      {
+        // いちばん大事な質問なので最後に。ここで残った候補の順位が決まる
+        text: "一番重視したいのは？",
+        answers: [
+          { label: "処理性能（サクサク動く）", attr: "performance" },
+          { label: "軽さ・持ち運びやすさ", attr: "portability" },
+          { label: "バッテリーの持ち", attr: "battery" },
+          { label: "画面の見やすさ（大きさ）", attr: "screen" },
+          { label: "値段の安さ", attr: "value" },
+          { label: "特にない（バランス重視）", attr: "overall" },
+        ],
+      },
     ],
   },
 };
